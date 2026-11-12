@@ -1,0 +1,12 @@
+{
+  "_comment": "Preference fixtures. u_1001 carries a constraint (budget) so tier-one injection has something to prioritise (R-P2). u_1002 carries a card-like number that the write filter MUST refuse (R-P3) — loader.py reports it as a rejected sample rather than silently storing it.",
+  "preferences": [
+    {"user_id": "u_1001", "pref_key": "budget_limit", "pref_value": "预算不超过 2000 元", "category": "constraint", "source_session_id": "s_seed_001"},
+    {"user_id": "u_1001", "pref_key": "preferred_category", "pref_value": "主要看手机", "category": "preference", "source_session_id": "s_seed_001"},
+    {"user_id": "u_1001", "pref_key": "avoid_brand", "pref_value": "不考虑苹果生态", "category": "constraint", "source_session_id": "s_seed_002"},
+
+    {"user_id": "u_1002", "pref_key": "usage_scene", "pref_value": "通勤听歌用耳机", "category": "context", "source_session_id": "s_seed_003"},
+    {"user_id": "u_1002", "pref_key": "card_hint", "pref_value": "用卡 6222 0213 8800 1234 支付", "category": "context", "source_session_id": "s_seed_003", "_expect": "rejected_by_write_filter"},
+    {"user_id": "u_1002", "pref_key": "price_sensitivity", "pref_value": "只买有满减活动的", "category": "preference", "source_session_id": "s_seed_003"}
+  ]
+}

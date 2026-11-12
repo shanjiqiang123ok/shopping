@@ -1,0 +1,67 @@
+[project]
+name = "shopping-backend"
+version = "0.1.0"
+description = "LangGraph shopping-guide agent service with an embedded mock storefront backend (SQLite first, MySQL/Postgres ready)"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.121.0",
+    "uvicorn[standard]>=0.34.0",
+    "pydantic[email]>=2.11.0",
+    "pydantic-settings>=2.8.0",
+    "python-dotenv>=1.1.0",
+    "structlog>=25.2.0",
+    "sqlmodel>=0.0.25",
+    "alembic>=1.13.0",
+    "httpx>=0.28.0",
+    "tenacity>=9.1.0",
+    "langgraph>=1.0.2",
+    "langgraph-checkpoint-sqlite>=2.0.10",
+    "aiosqlite>=0.21.0",
+    "langchain-core>=1.0.4",
+]
+
+[project.optional-dependencies]
+mysql = ["pymysql>=1.1.1"]
+postgres = ["psycopg[binary]>=3.3.0", "langgraph-checkpoint-postgres>=3.0.1"]
+llm = ["langchain-openai>=1.0.2"]
+
+[project.scripts]
+shopping-seed = "shopping_backend.seeds.loader:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/shopping_backend"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=1.0.0",
+    "ruff>=0.9.0",
+    "langchain-openai>=1.0.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+python_files = ["test_*.py"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "spike: LangGraph API verification probes, skipped unless network/keys available",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 119
+target-version = "py313"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "UP", "I", "SIM"]
+ignore = ["E501", "B008", "UP042", "UP046", "UP047"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402", "F401"]
+"tests/*" = ["B011"]

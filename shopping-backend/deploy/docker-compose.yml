@@ -1,0 +1,97 @@
+# Production topology: agent + business + MySQL. NOT used locally (no Docker installed here);
+# the local path is `scripts/run_dev.sh` / `scripts/run_demo.py` against SQLite.
+#
+#   DB_ROOT_PASSWORD=... DB_PASSWORD=... AGENT_TOKEN=... \
+#     docker compose -f deploy/docker-compose.yml up -d
+#   docker compose -f deploy/docker-compose.yml exec business alembic upgrade head
+
+name: shopping-backend
+
+services:
+  mysql:
+    image: mysql:8.4
+    command: ["--default-authentication-plugin=mysql_native_password"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: shopping
+      MYSQL_USER: shopping
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql.cnf.example:/etc/mysql/conf.d/shopping.cnf:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    ports:
+      - "3306:3306"
+
+  business:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: business
+    environment:
+      APP_ENV: prod
+      DATABASE_URL: mysql+pymysql://shopping:${DB_PASSWORD}@mysql:3306/shopping?charset=utf8mb4
+      BUSINESS_API_TOKEN: ${BUSINESS_TOKEN:?set BUSINESS_TOKEN}
+      SEED_ON_STARTUP: "false"
+      CHECKPOINT_BACKEND: sqlite          # see docs/EXTENSION_DB_DOCKER.md §3.5
+      CHECKPOINT_DB_PATH: /data/business-checkpoints.db
+      LOG_LEVEL: INFO
+    volumes:
+      - business-data:/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+
+  agent:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: agent
+    environment:
+      APP_ENV: prod
+      # The agent process does not own business data; it only needs a URL for the request-log
+      # table. Point it at the same MySQL so ops can query one place.
+      DATABASE_URL: mysql+pymysql://shopping:${DB_PASSWORD}@mysql:3306/shopping?charset=utf8mb4
+      AGENT_MODE: ${AGENT_MODE:-rule_based}
+      AGENT_INTERNAL_TOKEN: ${AGENT_TOKEN:?set AGENT_TOKEN}
+      BACKEND_DRIVER: http
+      BUSINESS_API_BASE_URL: http://business:8001
+      BUSINESS_API_TOKEN: ${BUSINESS_TOKEN}
+      BUSINESS_API_TIMEOUT_S: "5"
+      BUSINESS_API_MAX_RETRY: "2"
+      CHECKPOINT_BACKEND: sqlite
+      CHECKPOINT_DB_PATH: /data/agent-checkpoints.db
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      SEED_ON_STARTUP: "false"
+      LOG_LEVEL: INFO
+    volumes:
+      - agent-data:/data
+    depends_on:
+      business:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  # Multi-replica agent deployments must move the checkpointer off a local volume:
+  # set CHECKPOINT_BACKEND=postgres and run `uv sync --extra postgres` in the image.
+  # postgres:
+  #   image: postgres:16
+  #   environment: { POSTGRES_DB: checkpoints, POSTGRES_USER: checkpoints, POSTGRES_PASSWORD: ${CP_PG_PASSWORD} }
+  #   volumes: [ "pg-data:/var/lib/postgresql/data" ]
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U checkpoints"]
+  #     interval: 5s
+  #     retries: 20
+
+volumes:
+  mysql-data:
+  business-data:
+  agent-data:
+  # pg-data:

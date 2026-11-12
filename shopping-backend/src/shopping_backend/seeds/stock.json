@@ -1,0 +1,16 @@
+{
+  "_comment": "Warehouse-level rows; `available` is never stored, it is computed as sum(max(on_hand - reserved, 0)) per R-S1. g_0005 (off_sale) and g_0008 (no-record sample) intentionally have no rows.",
+  "stock": [
+    {"goods_id": "g_0001", "warehouse": "WH-NJ", "on_hand": 10, "reserved": 2},
+    {"goods_id": "g_0001", "warehouse": "WH-SH", "on_hand": 5, "reserved": 1},
+    {"goods_id": "g_0002", "warehouse": "WH-NJ", "on_hand": 2, "reserved": 0},
+    {"goods_id": "g_0003", "warehouse": "WH-SH", "on_hand": 20, "reserved": 0},
+    {"goods_id": "g_0004", "warehouse": "WH-NJ", "on_hand": 8, "reserved": 8},
+    {"goods_id": "g_0006", "warehouse": "WH-NJ", "on_hand": 6, "reserved": 6},
+    {"goods_id": "g_0007", "warehouse": "WH-SH", "on_hand": 30, "reserved": 2},
+    {"goods_id": "g_0009", "warehouse": "WH-GZ", "on_hand": 4, "reserved": 9},
+    {"goods_id": "g_0010", "warehouse": "WH-NJ", "on_hand": 12, "reserved": 0},
+    {"goods_id": "g_0011", "warehouse": "WH-NJ", "on_hand": 100, "reserved": 0},
+    {"goods_id": "g_0012", "warehouse": "WH-NJ", "on_hand": 60, "reserved": 0}
+  ]
+}

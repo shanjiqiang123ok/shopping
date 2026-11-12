@@ -1,0 +1,49 @@
+{
+  "_comment": "9 coupons covering every rejection reason of docs/SHOPPING_RULES.md §2.3. discount_value: amount = cents, percent = permille (900 => 9折), shipping = ignored. total_quota -1 means unlimited.",
+  "coupons": [
+    {"id": "c_0001", "code": "M1500_100", "name": "手机满1500减100", "scope": "category", "scope_value": "phone",
+     "threshold_cents": 150000, "discount_type": "amount", "discount_value": 10000,
+     "valid_from": "2026-11-01T00:00:00", "valid_to": "2026-12-31T15:59:59",
+     "total_quota": -1, "used_count": 0, "per_user_limit": 1, "status": "active"},
+
+    {"id": "c_0002", "code": "M2000_150", "name": "满2000减150", "scope": "category", "scope_value": "phone",
+     "threshold_cents": 200000, "discount_type": "amount", "discount_value": 15000,
+     "valid_from": "2026-11-01T00:00:00", "valid_to": "2026-12-31T15:59:59",
+     "total_quota": 1000, "used_count": 180, "per_user_limit": 1, "status": "active"},
+
+    {"id": "c_0003", "code": "M199_20", "name": "耳机满199减20", "scope": "category", "scope_value": "earphone",
+     "threshold_cents": 19900, "discount_type": "amount", "discount_value": 2000,
+     "valid_from": "2026-11-01T00:00:00", "valid_to": "2026-12-31T15:59:59",
+     "total_quota": -1, "used_count": 0, "per_user_limit": 2, "status": "active"},
+
+    {"id": "c_0004", "code": "ACC90", "name": "配件9折", "scope": "category", "scope_value": "accessory",
+     "threshold_cents": 0, "discount_type": "percent", "discount_value": 900,
+     "valid_from": "2026-11-01T00:00:00", "valid_to": "2026-12-31T15:59:59",
+     "total_quota": -1, "used_count": 0, "per_user_limit": 0, "status": "active"},
+
+    {"id": "c_0005", "code": "FREESHIP", "name": "全场免邮", "scope": "all", "scope_value": "",
+     "threshold_cents": 0, "discount_type": "shipping", "discount_value": 0,
+     "valid_from": "2026-11-01T00:00:00", "valid_to": "2026-12-31T15:59:59",
+     "total_quota": -1, "used_count": 0, "per_user_limit": 0, "status": "active"},
+
+    {"id": "c_0006", "code": "M500_50", "name": "满500减50（已暂停）", "scope": "all", "scope_value": "",
+     "threshold_cents": 50000, "discount_type": "amount", "discount_value": 5000,
+     "valid_from": "2026-11-01T00:00:00", "valid_to": "2026-12-31T15:59:59",
+     "total_quota": -1, "used_count": 0, "per_user_limit": 1, "status": "paused"},
+
+    {"id": "c_0007", "code": "M1000_200", "name": "满1000减200（已过期）", "scope": "all", "scope_value": "",
+     "threshold_cents": 100000, "discount_type": "amount", "discount_value": 20000,
+     "valid_from": "2026-01-01T00:00:00", "valid_to": "2026-01-31T15:59:59",
+     "total_quota": -1, "used_count": 0, "per_user_limit": 1, "status": "active"},
+
+    {"id": "c_0008", "code": "M300_30", "name": "满300减30（已抢完）", "scope": "all", "scope_value": "",
+     "threshold_cents": 30000, "discount_type": "amount", "discount_value": 3000,
+     "valid_from": "2026-11-01T00:00:00", "valid_to": "2026-12-31T15:59:59",
+     "total_quota": 100, "used_count": 100, "per_user_limit": 1, "status": "active"},
+
+    {"id": "c_0009", "code": "M5000_600", "name": "满5000减600（门槛高于目标商品）", "scope": "all", "scope_value": "",
+     "threshold_cents": 500000, "discount_type": "amount", "discount_value": 60000,
+     "valid_from": "2026-11-01T00:00:00", "valid_to": "2026-12-31T15:59:59",
+     "total_quota": -1, "used_count": 0, "per_user_limit": 1, "status": "active"}
+  ]
+}

@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>shopping-backend 调试对话页</title>
+<style>
+  :root { --line:#e3e6eb; --ink:#1f2430; --muted:#6b7280; --accent:#2563eb; --warn:#b45309; --bad:#b91c1c; --good:#15803d; }
+  * { box-sizing: border-box; }
+  body { margin:0; height:100vh; display:flex; flex-direction:column; font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif; color:var(--ink); background:#f6f7f9; }
+  header { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px 14px; background:#fff; border-bottom:1px solid var(--line); }
+  header h1 { font-size:15px; margin:0 auto 0 0; font-weight:600; }
+  header .tag { font-size:12px; color:var(--muted); }
+  input, button, textarea { font:inherit; }
+  input[type=text] { padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  #token { width:150px; }
+  #user { width:110px; }
+  #session { width:150px; }
+  button { padding:6px 10px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; }
+  button:hover { border-color:var(--accent); color:var(--accent); }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button[disabled] { opacity:.55; cursor:not-allowed; }
+  main { flex:1; overflow-y:auto; padding:16px; }
+  .quick { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+  .quick button { font-size:12px; color:var(--muted); }
+  .row { display:flex; margin-bottom:12px; }
+  .row.me { justify-content:flex-end; }
+  .bubble { max-width:760px; padding:10px 12px; border-radius:10px; background:#fff; border:1px solid var(--line); white-space:pre-wrap; }
+  .bubble.alarm { border-color:var(--bad); background:#fff5f5; }
+  .row.me .bubble { background:#e8f0ff; border-color:#cfe0ff; }
+  .bubble .who { font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .debug { margin-top:8px; border-top:1px dashed var(--line); padding-top:8px; font-size:12px; color:var(--muted); }
+  .chips { display:flex; flex-wrap:wrap; gap:4px; margin:4px 0; }
+  .chip { border:1px solid var(--line); border-radius:999px; padding:1px 8px; background:#fafafa; }
+  .chip.hit { border-color:var(--accent); color:var(--accent); }
+  .chip.bad { border-color:var(--bad); color:var(--bad); }
+  .badge.warn { color:var(--warn); }
+  .badge.bad { color:var(--bad); }
+  .badge.good { color:var(--good); }
+  table { border-collapse:collapse; width:100%; margin-top:6px; font-size:12px; }
+  th, td { border:1px solid var(--line); padding:4px 6px; text-align:left; vertical-align:top; }
+  th { background:#fafafa; font-weight:600; }
+  td.wrap { word-break:break-all; }
+  .check { background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:14px; }
+  .check h2 { font-size:13px; margin:0 0 4px; font-weight:600; }
+  .check .hint { font-size:12px; color:var(--muted); margin-bottom:6px; }
+  footer { display:flex; gap:8px; padding:12px 14px; background:#fff; border-top:1px solid var(--line); }
+  #ask { flex:1; resize:vertical; min-height:38px; padding:8px; border:1px solid var(--line); border-radius:6px; font:inherit; }
+  .note { font-size:12px; color:var(--muted); padding:0 14px 8px; background:#fff; }
+  @media (max-width:640px) {
+    header { gap:6px; padding:8px 10px; }
+    header h1 { width:100%; margin:0 0 4px; }
+    #token, #user, #session { width:100%; }
+    main { padding:10px; }
+    .bubble { max-width:100%; font-size:13px; }
+    table { display:block; overflow-x:auto; }
+    footer { padding:10px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>导购 Agent 调试对话页</h1>
+  <span class="tag" id="meta">就绪</span>
+  <label>token <input type="text" id="token" placeholder="dev-token"></label>
+  <label>user <input type="text" id="user"></label>
+  <label>session <input type="text" id="session"></label>
+  <button id="newSession">新会话</button>
+  <button id="selfCheck">分支自检</button>
+  <button id="clear">仅清屏</button>
+  <button id="clearHistory">清历史</button>
+</header>
+
+<main id="log">
+  <div class="quick" id="quick"></div>
+</main>
+
+<div class="note">这个页面只用于本机联调：直连同源 <code>/api/shopping-agent/run</code>，不发送任何外部请求。对话历史存本地 <code>localStorage</code>（最近 50 条），后端 checkpoint 才是续问的持久真相。正式聊天界面由 MaxKB 提供，接入方式见 <code>docs/MAXKB_INTEGRATION.md</code>。</div>
+
+<footer>
+  <textarea id="ask" rows="2" placeholder="例如：推荐 2000 元以内的手机，有券吗（Enter 发送，Shift+Enter 换行）"></textarea>
+  <button class="primary" id="send">发送</button>
+</footer>
+
+<script>
+"use strict";
+
+const QUICK = [
+  "推荐 2000 元以内的手机",
+  "推荐 2000 元以内的手机，有券吗",
+  "Redmi Note 13 Pro 有货吗",
+  "这款卖断了的耳机有优惠券吗",
+  "有什么满减活动",
+  "推荐 5000 元以内的电视",
+  "第二款有货吗",
+  "帮我下单买第一个"
+];
+
+const N = { sup: "supervisor", goods: "goods_worker", stock: "stock_worker", coupon: "coupon_worker", sum: "summarize" };
+const KEY = { token: "sb_token", user: "sb_user", session: "sb_session", history: "sb_history" };
+const HISTORY_MAX = 50;
+const LOG_FILE = "logs/shopping-dev.jsonl";
+
+const els = {};
+["token", "user", "session", "ask", "send", "log", "quick", "meta", "newSession", "clear", "clearHistory", "selfCheck"]
+  .forEach((id) => { els[id] = document.getElementById(id); });
+
+const store = {
+  get(key, fallback) {
+    try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; }
+  },
+  set(key, value) {
+    try { localStorage.setItem(key, value); } catch (e) { /* 隐私模式下忽略 */ }
+  },
+  json(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (e) { return fallback; }
+  }
+};
+
+function randomId(prefix) {
+  return prefix + Math.random().toString(36).slice(2, 8);
+}
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = String(text);   // textContent：外部数据永不作为 HTML 解析
+  return node;
+}
+
+function initIdentity() {
+  els.token.value = store.get(KEY.token, "dev-token");
+  els.user.value = store.get(KEY.user, "u_demo");
+  els.session.value = store.get(KEY.session, randomId("s_"));
+}
+
+function rememberIdentity() {
+  store.set(KEY.token, els.token.value.trim());
+  store.set(KEY.user, els.user.value.trim());
+  store.set(KEY.session, els.session.value.trim());
+}
+
+// ------------------------------------------------------------------ history
+
+let history = [];
+
+function loadHistory() {
+  const raw = store.json(KEY.history, []);
+  history = (Array.isArray(raw) ? raw : []).slice(-HISTORY_MAX);   // 上限在读取时也夹一次，防手工塞满 storage
+  store.set(KEY.history, JSON.stringify(history));
+}
+
+function pushHistory(entry) {
+  history.push(entry);
+  if (history.length > HISTORY_MAX) history = history.slice(-HISTORY_MAX);
+  store.set(KEY.history, JSON.stringify(history));
+}
+
+function bubbleRow(box, side) {
+  const row = el("div", "row" + (side === "me" ? " me" : ""));
+  row.append(box);
+  els.log.append(row);
+  els.log.scrollTop = els.log.scrollHeight;
+  return row;
+}
+
+function bubble(title, text) {
+  const box = el("div", "bubble");
+  box.append(el("div", "who", title), el("div", null, text));
+  bubbleRow(box, title === "我" ? "me" : "");
+  return box;
+}
+
+function renderHistory() {
+  history.forEach((entry) => {
+    if (entry.role === "me") bubble("我", entry.text);
+    else renderAgent(entry, entry.text || "（无回答内容）");
+  });
+}
+
+function renderAgent(entry, answerText) {
+  const box = bubble("Agent", answerText);
+  if (entry.httpText) box.append(el("div", "badge bad", entry.httpText));
+  if (entry.payload) addDebug(box, entry.payload);
+  return box;
+}
+
+// ------------------------------------------------------------------ debug panel
+
+function chip(label, kind) {
+  return el("span", "chip" + (kind ? " " + kind : ""), label);
+}
+
+function traceOf(payload) {
+  return ((payload && payload.meta) || {}).route_trace || [];
+}
+
+function addDebug(box, payload) {
+  const meta = payload.meta || {};
+  const data = payload.data || {};
+  const counts = meta.counts || {};
+  const drops = counts.grounding_drops || 0;
+  const panel = el("div", "debug");
+
+  if (drops > 0) box.classList.add("alarm");                       // F2-4：整条气泡标红
+
+  const trace = el("div");
+  trace.append(chip("route_trace", "hit"));
+  traceOf(payload).forEach((node) => trace.append(chip(node, node === N.sup || node === N.sum ? "" : "hit")));
+  panel.append(trace);
+
+  const degraded = meta.degraded === true;
+  const facts = el("div", "chips");
+  facts.append(chip("intent: " + (data.intent || "-"), "hit"));
+  facts.append(chip("degraded: " + degraded, degraded ? "bad" : ""));
+  facts.append(chip("goods: " + (counts.goods || 0)));
+  facts.append(chip("coupons: " + (counts.coupons || 0)));
+  facts.append(chip("dropped_rows: " + (counts.dropped_rows || 0), (counts.dropped_rows || 0) > 0 ? "bad" : ""));
+  facts.append(chip("grounding_drops: " + drops, drops > 0 ? "bad" : ""));
+  facts.append(chip((meta.latency_ms || 0) + " ms"));
+  facts.append(chip("mode: " + (meta.mode || "-") + " / " + (meta.backend || "-")));
+  panel.append(facts);
+
+  if (meta.error_msg) panel.append(el("div", "badge bad", "error_msg: " + meta.error_msg));
+
+  if (drops > 0) {
+    panel.append(el(
+      "div",
+      "badge bad",
+      "grounding_drops > 0：有话术内容在业务库里找不到出处，已被护栏 L7 剔除。排查：在 " + LOG_FILE +
+      " 里找 guardrail_L7_dropped_lines 那条日志，对照其中的商品/券字段与话术原文，确认是数据缺列还是话术模板取了不该取的字段。"
+    ));
+  }
+
+  const goods = data.goods || [];
+  if (goods.length) {
+    const table = el("table");
+    const head = el("tr");
+    ["#", "商品", "价格(分)", "可售", "券码"].forEach((label) => head.append(el("th", null, label)));
+    table.append(head);
+    goods.forEach((item, index) => {
+      const tr = el("tr");
+      [String(index + 1), item.title, String(item.price_cents), String(item.available), (item.coupon_codes || []).join(", ") || "-"]
+        .forEach((value) => tr.append(el("td", "wrap", value)));
+      table.append(tr);
+    });
+    panel.append(table);
+  }
+
+  panel.append(el("div", null, "thread_id: " + (meta.thread_id || "-")));
+  box.append(panel);
+}
+
+function setStatus(text, isError) {
+  els.meta.textContent = text;
+  els.meta.style.color = isError ? "var(--bad)" : "var(--muted)";
+}
+
+// ------------------------------------------------------------------ transport
+
+async function postRun(query, identity) {
+  try {
+    const response = await fetch("/api/shopping-agent/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + identity.token },
+      body: JSON.stringify({ user_id: identity.user, session_id: identity.session, query: query })
+    });
+    let payload = null;
+    try { payload = await response.json(); } catch (e) { payload = null; }
+    return { ok: response.ok, status: response.status, payload: payload };
+  } catch (error) {
+    return { ok: false, status: 0, payload: null, network_error: error.message };
+  }
+}
+
+function httpErrorText(result) {
+  if (result.status === 0) return "请求失败：" + (result.network_error || "网络异常，服务是否已启动？");
+  const payload = result.payload || {};
+  const details = (payload.errors || []).map((item) => (item.loc || []).join(".") + ": " + item.msg).join("; ");
+  return "HTTP " + result.status + " " + (payload.error_code || "") + (details ? " · " + details : "");
+}
+
+function currentIdentity() {
+  return { token: els.token.value.trim(), user: els.user.value.trim(), session: els.session.value.trim() };
+}
+
+// ------------------------------------------------------------------ interactive turn
+
+let busy = false;
+
+async function send(text) {
+  const query = (text || "").trim();
+  if (!query || busy) return;
+  busy = true;
+  rememberIdentity();
+
+  bubble("我", query);
+  pushHistory({ role: "me", text: query });
+  els.ask.value = "";
+  const waiting = bubble("Agent", "查询中…");
+  els.send.disabled = true;
+
+  try {
+    const result = await postRun(query, currentIdentity());
+    const body = waiting.children[1];
+    const payload = result.payload;
+    const answer = payload === null ? "" : payload.answer !== undefined ? String(payload.answer) : JSON.stringify(payload, null, 2);
+    body.textContent = answer || "（本轮未取得回答）";
+
+    const entry = { role: "agent", text: body.textContent };
+    if (!result.ok || !result.payload) {
+      entry.httpText = httpErrorText(result);
+      waiting.append(el("div", "badge bad", entry.httpText));
+      setStatus(result.status ? "HTTP " + result.status : "请求失败", true);
+    } else {
+      entry.payload = result.payload;
+      addDebug(waiting, result.payload);
+      setStatus(result.payload.meta && result.payload.meta.degraded ? "已回答（降级：数据未取到）" : "已回答", false);
+    }
+    pushHistory(entry);
+  } finally {
+    busy = false;
+    els.send.disabled = false;
+    els.ask.focus();
+    els.log.scrollTop = els.log.scrollHeight;
+  }
+}
+
+// ------------------------------------------------------------------ F2-3 branch self-check
+
+const CASES = [
+  {
+    title: "1 选品有货 → 不查券",
+    queries: ["推荐 2000 元以内的手机"],
+    expect: [N.sup, N.goods, N.stock, N.sum],
+    verdict: (ps) => {
+      const c = (ps[0].meta || {}).counts || {};
+      return check(c.goods === 3 && !(c.coupons > 0) && (ps[0].meta || {}).degraded === false,
+        "goods=" + c.goods + " coupons=" + (c.coupons || 0) + " degraded=" + (ps[0].meta || {}).degraded);
+    }
+  },
+  {
+    title: "2 具名商品查库存（先解析 ID）",
+    queries: ["Redmi Note 13 Pro 有货吗"],
+    expect: [N.sup, N.goods, N.stock, N.sum],
+    verdict: (ps) => {
+      const p = ps[0];
+      const goods = (p.data || {}).goods || [];
+      const ids = (p.meta || {}).seen_goods_ids || [];
+      // 解析出的必须是库里真实 id（§9 用例 2 的“不编造 ID”），命中多条也算通过
+      return check(goods.length > 0 && ids.length > 0 && ids.indexOf(goods[0].id) >= 0,
+        "首条=" + (goods[0] ? goods[0].id : "-") + " 可售=" + (goods[0] ? goods[0].available : "-") + " seen_goods_ids=" + ids.length);
+    }
+  },
+  {
+    title: "3 全缺货 → 必走优惠券",
+    queries: ["这款卖断了的耳机有优惠券吗"],
+    expect: [N.sup, N.goods, N.stock, N.coupon, N.sum],
+    verdict: (ps) => {
+      const p = ps[0];
+      return check((p.data || {}).intent === "composite" && ((p.meta || {}).counts || {}).coupons > 0,
+        "intent=" + (p.data || {}).intent + " coupons=" + (((p.meta || {}).counts || {}).coupons || 0));
+    }
+  },
+  {
+    title: "4 纯券查询",
+    queries: ["有什么满减活动"],
+    expect: [N.sup, N.coupon, N.sum],
+    verdict: (ps) => check((((ps[0].meta || {}).counts || {}).coupons || 0) > 0,
+      "coupons=" + (((ps[0].meta || {}).counts || {}).coupons || 0))
+  },
+  {
+    title: "5 无结果 → 澄清话术不硬凑",
+    queries: ["推荐 5000 元以内的电视"],
+    expect: [N.sup, N.goods, N.sum],
+    verdict: (ps) => {
+      const p = ps[0];
+      return check((((p.meta || {}).counts || {}).goods || 0) === 0,
+        "goods=" + (((p.meta || {}).counts || {}).goods || 0));
+    }
+  },
+  {
+    title: "7 同会话续问「第二款」（checkpoint）",
+    queries: ["推荐 2000 元以内的手机", "第二款有货吗"],
+    expect: [N.sup, N.goods, N.stock, N.sum],
+    verdict: (ps) => {
+      const ordered = (((ps[0].data || {}).goods) || []).slice().sort((a, b) => a.price_cents - b.price_cents);
+      const want = ordered.length > 1 ? ordered[1].id : null;
+      const got = (((ps[1].data || {}).goods) || []).map((item) => item.id);
+      return check(got.length === 1 && got[0] === want, "期望=" + want + " 实际=" + got.join(","));
+    }
+  },
+  {
+    title: "8 交易类请求 → 拒答",
+    queries: ["帮我下单买第一个"],
+    expect: [N.sup, N.sum],
+    verdict: (ps) => {
+      const p = ps[0];
+      return check((((p.meta || {}).counts || {}).goods || 0) === 0,
+        "intent=" + (p.data || {}).intent + " goods=" + (((p.meta || {}).counts || {}).goods || 0));
+    }
+  }
+];
+
+function check(pass, detail) {
+  return { pass: pass, detail: detail };
+}
+
+function buildCheckPanel() {
+  const box = el("div", "check");
+  box.append(el("h2", null, "分支自检（与 docs/SHOPPING_RULES.md §9、scripts/run_demo.py 同口径）"));
+  box.append(el("div", "hint", null,
+    "每条用例会临时换一个独立 session（不影响你当前会话），只发同源请求。"
+    + "用例 6「业务后端不可达 → degraded」需要 BACKEND_DRIVER=http 且不启动 business 服务，页面内无法制造，请按手工清单第 6 项验证。"));
+
+  const table = el("table");
+  const head = el("tr");
+  ["用例", "期望链路", "实际链路", "结论"].forEach((label) => head.append(el("th", null, label)));
+  table.append(head);
+  CASES.forEach((item) => {
+    const tr = el("tr");
+    tr.append(el("td", "wrap", item.title));
+    tr.append(el("td", "wrap", item.expect.join(" → ")));
+    tr.append(el("td", "wrap", "…"));
+    tr.append(el("td", "wrap", "运行中"));
+    table.append(tr);
+    item.cells = { actual: tr.children[2], result: tr.children[3] };
+  });
+  box.append(table);
+  return box;
+}
+
+async function runSelfCheck() {
+  if (busy) return;
+  busy = true;
+  els.send.disabled = true;
+  rememberIdentity();
+
+  const identity = currentIdentity();
+  const batch = randomId("s_check_");
+  const panel = buildCheckPanel();
+  els.log.prepend(panel);
+
+  let passed = 0;
+  for (const item of CASES) {
+    // session_id 只允许 [A-Za-z0-9_-]，所以用用例编号当线程后缀，每条用例各占一个 checkpoint 线程
+    const thread = batch + "_" + item.title.match(/^\d+/)[0];
+    const payloads = [];
+    let failure = null;
+    for (const query of item.queries) {
+      const result = await postRun(query, { token: identity.token, user: identity.user, session: thread });
+      if (!result.ok || !result.payload) { failure = httpErrorText(result); break; }
+      payloads.push(result.payload);
+    }
+
+    const got = payloads.length ? traceOf(payloads[payloads.length - 1]) : [];
+    item.cells.actual.textContent = got.join(" → ") || "—";
+
+    let verdict;
+    if (failure) verdict = { pass: false, detail: failure };
+    else if (got.join(" ") !== item.expect.join(" ")) verdict = { pass: false, detail: "链路不符" };
+    else verdict = item.verdict(payloads);
+
+    item.cells.result.textContent = verdict.pass ? "通过" : "不符";
+    item.cells.result.className = "wrap " + (verdict.pass ? "badge good" : "badge bad");
+    if (!verdict.pass) item.cells.result.append(el("span", null, " · " + verdict.detail));
+    if (verdict.pass) passed += 1;
+    setStatus("自检中 " + passed + "/" + CASES.length, false);
+  }
+
+  const allPass = passed === CASES.length;
+  setStatus("自检完成：" + passed + "/" + CASES.length + " 通过" + (allPass ? "" : "，不符项见结论列"), !allPass);
+  busy = false;
+  els.send.disabled = false;
+}
+
+// ------------------------------------------------------------------ wiring
+
+QUICK.forEach((question) => {
+  const button = el("button", null, question);
+  button.addEventListener("click", () => send(question));
+  els.quick.append(button);
+});
+
+els.send.addEventListener("click", () => send(els.ask.value));
+els.ask.addEventListener("keydown", (event) => {
+  // F2-1：输入法候选确认的 Enter 带 isComposing，不能当成发送
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+    send(els.ask.value);
+  }
+});
+els.newSession.addEventListener("click", () => {
+  els.session.value = randomId("s_");
+  rememberIdentity();
+  setStatus("已开新会话（上一轮的候选商品不再复用）", false);
+});
+els.clear.addEventListener("click", () => {
+  els.log.querySelectorAll(".row, .check").forEach((node) => node.remove());
+  setStatus("已清屏（本地历史仍在，刷新可复现）", false);
+});
+els.clearHistory.addEventListener("click", () => {
+  history = [];
+  try { localStorage.removeItem(KEY.history); } catch (e) { /* 隐私模式下忽略 */ }
+  els.log.querySelectorAll(".row, .check").forEach((node) => node.remove());
+  setStatus("已清空本地历史", false);
+});
+els.selfCheck.addEventListener("click", runSelfCheck);
+["token", "user", "session"].forEach((id) => els[id].addEventListener("change", rememberIdentity));
+
+initIdentity();
+loadHistory();
+renderHistory();
+els.ask.focus();
+</script>
+</body>
+</html>
